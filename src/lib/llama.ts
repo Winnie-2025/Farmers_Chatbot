@@ -27,7 +27,12 @@ export class LlamaService {
   private async checkAvailability(): Promise<void> {
     try {
       // Check if API key is available
-      this.isAvailable = !!import.meta.env.VITE_HUGGINGFACE_API_KEY;
+      const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
+      this.isAvailable = !!(apiKey && apiKey !== 'your_huggingface_api_key_here');
+      
+      if (!this.isAvailable) {
+        console.warn('Llama service disabled: VITE_HUGGINGFACE_API_KEY not configured');
+      }
     } catch (error) {
       console.warn('Llama service not available:', error);
       this.isAvailable = false;
@@ -74,7 +79,8 @@ export class LlamaService {
       };
     } catch (error) {
       console.error('Llama generation error:', error);
-      throw new Error('Failed to generate response');
+      // Don't throw error, let the calling code handle fallback
+      throw error;
     }
   }
 

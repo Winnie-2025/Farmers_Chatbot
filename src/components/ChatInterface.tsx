@@ -573,7 +573,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
           setMessages((prev) => [...prev, llamaResponse]);
           saveChatMessage(llamaResponse);
         }).catch(error => {
-          console.warn('Llama failed, using fallback:', error);
+          console.warn('Llama failed, using fallback response system');
           const fallbackResponse = generateBotResponse(text, category);
           const botResponse: Message = {
             id: (Date.now() + 2).toString(),

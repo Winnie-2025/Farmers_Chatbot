@@ -11,11 +11,13 @@ export const useAuth = () => {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.warn('Session retrieval error:', error.message);
+        // Don't treat auth errors as fatal - just continue without user
       }
       setUser(session?.user ?? null)
       setLoading(false)
     }).catch((error) => {
       console.warn('Failed to get session:', error.message);
+      // Gracefully handle auth failures
       setUser(null);
       setLoading(false);
     });
@@ -23,9 +25,7 @@ export const useAuth = () => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-          console.log('Auth event:', event);
-        }
+        console.log('Auth event:', event);
         setUser(session?.user ?? null)
         setLoading(false)
       }
