@@ -556,16 +556,23 @@ ${recommendations.slice(0, 3).map((rec, index) =>
     setTimeout(() => {
       let botResponseText: string;
       
-      // Try to use Llama if available, otherwise fall back to rule-based responses
+      // Try to use Llama AI for smart responses if available
       if (llamaService.isServiceAvailable()) {
+        console.log('🦙 Using Llama AI for smart response generation...');
         llamaService.generateResponse(text, {
           category,
           farmData: parseAgricultureData().slice(0, 10),
-          userPreferences: { location: 'South Africa', language: 'en' }
+          userPreferences: { 
+            location: 'South Africa', 
+            language: 'en',
+            farmType: 'mixed',
+            experience: 'intermediate'
+          }
         }).then(response => {
+          console.log('✅ Llama AI response generated successfully');
           const llamaResponse: Message = {
             id: (Date.now() + 2).toString(),
-            text: response.text,
+            text: `🤖 **AI Response** (Confidence: ${Math.round(response.confidence * 100)}%)\n\n${response.text}`,
             sender: 'bot',
             timestamp: new Date(),
             category,
@@ -573,11 +580,11 @@ ${recommendations.slice(0, 3).map((rec, index) =>
           setMessages((prev) => [...prev, llamaResponse]);
           saveChatMessage(llamaResponse);
         }).catch(error => {
-          console.warn('Llama failed, using fallback response system');
+          console.warn('🦙 Llama AI failed, using fallback response system:', error.message);
           const fallbackResponse = generateBotResponse(text, category);
           const botResponse: Message = {
             id: (Date.now() + 2).toString(),
-            text: fallbackResponse,
+            text: `📚 **Knowledge Base Response**\n\n${fallbackResponse}`,
             sender: 'bot',
             timestamp: new Date(),
             category,
@@ -588,17 +595,18 @@ ${recommendations.slice(0, 3).map((rec, index) =>
         return; // Exit early for async Llama response
       }
       
-      // Fallback to rule-based responses
+      // Fallback to enhanced rule-based responses
+      console.log('📚 Using enhanced knowledge base for response...');
       botResponseText = generateBotResponse(text, category);
       
       // Add specific response for PDF attachments
       if (userMessage.attachment) {
-        botResponseText = `I can see you've attached a PDF document "${userMessage.attachment.name}". While I can't directly read PDF files yet, I can help you with any questions about the content you describe. Please tell me what specific information from the document you'd like help with, and I'll provide relevant farming advice.`;
+        botResponseText = `📄 **Document Analysis**\n\nI can see you've attached "${userMessage.attachment.name}". While I can't directly read PDF files yet, I can help you with any questions about the content you describe. Please tell me what specific information from the document you'd like help with, and I'll provide relevant farming advice.`;
       }
       
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: botResponseText,
+        text: `📚 **Knowledge Base Response**\n\n${botResponseText}`,
         sender: 'bot',
         timestamp: new Date(),
         category,
@@ -730,8 +738,16 @@ ${recommendations.slice(0, 3).map((rec, index) =>
         {/* Llama Status Indicator */}
         {llamaService.isServiceAvailable() && (
           <div className="mb-3 flex items-center space-x-2 text-sm text-green-600">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>🦙 Llama AI Enhanced - Smarter responses enabled</span>
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span>🦙 **AI Enhanced** - Smart responses powered by Llama AI</span>
+          </div>
+        )}
+        
+        {/* Llama Status Warning */}
+        {!llamaService.isServiceAvailable() && (
+          <div className="mb-3 flex items-center space-x-2 text-sm text-amber-600">
+            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+            <span>📚 **Knowledge Base Mode** - Add Hugging Face API key for AI responses</span>
           </div>
         )}
         
