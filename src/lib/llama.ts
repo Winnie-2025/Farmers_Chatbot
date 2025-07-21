@@ -1,7 +1,16 @@
-import { HfInference } from '@huggingface/inference';
+// OpenAI-compatible API service for smart farming responses
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
-// Initialize Hugging Face client
-const hf = new HfInference(import.meta.env.VITE_HUGGINGFACE_API_KEY);
+interface ChatResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
 
 export interface LlamaResponse {
   text: string;
@@ -13,6 +22,7 @@ export class LlamaService {
   private static instance: LlamaService;
   private isAvailable: boolean = false;
   private apiKey: string | null = null;
+  private baseUrl: string = 'https://api.openai.com/v1';
 
   private constructor() {
     this.checkAvailability();
@@ -27,17 +37,31 @@ export class LlamaService {
 
   private async checkAvailability(): Promise<void> {
     try {
-      // Check if API key is available
-      this.apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
-      this.isAvailable = !!(this.apiKey && this.apiKey !== 'your_huggingface_api_key_here' && this.apiKey.length > 10);
+      // Check for OpenAI API key first
+      this.apiKey = import.meta.env.VITE_OPENAI_API_KEY;
       
-      if (!this.isAvailable) {
-        console.warn('Llama service disabled: VITE_HUGGINGFACE_API_KEY not configured properly');
-      } else {
-        console.log('Llama service enabled with smart AI responses');
+      if (!this.apiKey || this.apiKey === 'your_openai_api_key_here' || this.apiKey.length < 10) {
+        // Try alternative providers
+        const altKey = import.meta.env.VITE_AI_API_KEY;
+        const altUrl = import.meta.env.VITE_AI_BASE_URL;
+        
+        if (altKey && altKey !== 'your_ai_api_key_here' && altKey.length > 10) {
+          this.apiKey = altKey;
+          this.baseUrl = altUrl || 'https://api.together.xyz/v1'; // Together AI as fallback
+          this.isAvailable = true;
+          console.log('🤖 AI service enabled with alternative provider');
+          return;
+        }
+        
+        console.warn('AI service disabled: No valid API key found');
+        this.isAvailable = false;
+        return;
       }
+      
+      this.isAvailable = true;
+      console.log('🤖 AI service enabled with OpenAI-compatible API');
     } catch (error) {
-      console.warn('Llama service not available:', error);
+      console.warn('AI service not available:', error);
       this.isAvailable = false;
     }
   }
@@ -51,30 +75,46 @@ export class LlamaService {
     } = {}
   ): Promise<LlamaResponse> {
     if (!this.isAvailable) {
-      throw new Error('Llama service not available');
+      throw new Error('AI service not available');
     }
 
     try {
-      // Create a farming-specific prompt
-      const systemPrompt = this.createSystemPrompt(context);
-      const fullPrompt = `${systemPrompt}\n\nHuman: ${userMessage}\n\nAssistant:`;
-
-      // Use Llama model for text generation with better parameters
-      const response = await hf.textGeneration({
-        model: 'microsoft/DialoGPT-medium',
-        inputs: fullPrompt,
-        parameters: {
-          max_new_tokens: 300,
-          temperature: 0.8,
-          top_p: 0.95,
-          repetition_penalty: 1.1,
-          return_full_text: false,
-          do_sample: true,
+      const messages: ChatMessage[] = [
+        {
+          role: 'system',
+          content: this.createSystemPrompt(context)
         },
+        {
+          role: 'user',
+          content: userMessage
+        }
+      ];
+
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.getModelName(),
+          messages: messages,
+          max_tokens: 300,
+          temperature: 0.7,
+          top_p: 0.9,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1
+        })
       });
 
-      // Extract and clean the response
-      const generatedText = response.generated_text?.trim() || '';
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('AI API Error:', response.status, errorText);
+        throw new Error(`AI API request failed: ${response.status}`);
+      }
+
+      const data: ChatResponse = await response.json();
+      const generatedText = data.choices[0]?.message?.content?.trim();
       
       if (!generatedText) {
         throw new Error('Empty response from AI model');
@@ -86,68 +126,52 @@ export class LlamaService {
         category: this.detectCategory(userMessage),
       };
     } catch (error) {
-      console.error('Llama generation error:', error);
-      
-      // Try alternative model if primary fails
-      try {
-        const fallbackResponse = await this.generateFallbackResponse(userMessage, context);
-        return fallbackResponse;
-      } catch (fallbackError) {
-        console.error('Fallback generation also failed:', fallbackError);
-        throw new Error('AI service temporarily unavailable');
-      }
+      console.error('AI generation error:', error);
+      throw new Error('AI service temporarily unavailable');
     }
   }
 
-  private async generateFallbackResponse(userMessage: string, context: any): Promise<LlamaResponse> {
-    // Try a simpler, more reliable model
-    const response = await hf.textGeneration({
-      model: 'gpt2',
-      inputs: `Farming advice: ${userMessage}`,
-      parameters: {
-        max_new_tokens: 150,
-        temperature: 0.7,
-        return_full_text: false,
-      },
-    });
-
-    const generatedText = response.generated_text?.trim() || '';
-    
-    return {
-      text: this.formatResponse(generatedText, userMessage),
-      confidence: 0.7,
-      category: this.detectCategory(userMessage),
-    };
+  private getModelName(): string {
+    // Use different models based on the provider
+    if (this.baseUrl.includes('openai.com')) {
+      return 'gpt-3.5-turbo';
+    } else if (this.baseUrl.includes('together.xyz')) {
+      return 'meta-llama/Llama-2-7b-chat-hf';
+    } else if (this.baseUrl.includes('groq.com')) {
+      return 'llama2-70b-4096';
+    }
+    return 'gpt-3.5-turbo'; // Default fallback
   }
 
   private createSystemPrompt(context: any): string {
     return `You are AgriAssist, an expert AI agricultural assistant specializing in South African farming. You provide practical, actionable advice for farmers in a conversational and helpful manner.
 
 Your expertise includes:
-- Crop management and cultivation
-- Livestock health and breeding
-- Pest and disease control
-- Soil management and fertilization
-- Weather-based farming decisions
-- Market prices and agricultural economics
-- Government schemes and funding
-- Sustainable farming practices
+- Crop management and cultivation (maize, wheat, tomatoes, potatoes, etc.)
+- Livestock health and breeding (cattle, sheep, goats, chickens)
+- Pest and disease control using IPM approaches
+- Soil management and fertilization for South African conditions
+- Weather-based farming decisions and climate adaptation
+- Market prices and agricultural economics in South Africa
+- Government schemes and funding opportunities
+- Sustainable farming practices and water conservation
 
 Response Guidelines:
-- Provide specific, actionable advice
-- Use South African context (climate, crops, markets)
-- Include practical tips and recommendations
-- Mention specific products, suppliers, or contacts when relevant
-- Be concise but comprehensive
-- Use farming terminology appropriately
-- Consider local seasons and conditions
+- Provide specific, actionable advice tailored to South African conditions
+- Use local context (climate zones, seasonal patterns, local suppliers)
+- Include practical tips with specific measurements and timings
+- Mention relevant products, suppliers, or contacts when helpful
+- Be concise but comprehensive (aim for 150-250 words)
+- Use appropriate farming terminology
+- Consider local seasons (summer: Dec-Feb, winter: Jun-Aug)
 - Be encouraging and supportive
 - Include relevant emojis for better readability
+- Focus on cost-effective solutions for small to medium farmers
 
-${context.category ? `Focus on: ${context.category}` : ''}
-${context.farmData ? `Use this farm data for insights: ${JSON.stringify(context.farmData.slice(0, 3))}` : ''}
+${context.category ? `Primary focus area: ${context.category}` : ''}
+${context.farmData ? `Reference data available from similar farms` : ''}
 
-Respond as a knowledgeable farming expert would.`;
+Always respond as a knowledgeable South African farming expert would, with practical solutions that farmers can implement immediately.`;
   }
 
   private formatResponse(text: string, userMessage: string): string {
@@ -157,52 +181,30 @@ Respond as a knowledgeable farming expert would.`;
       .replace(/\n\n+/g, '\n\n')
       .trim();
 
-    // Add farming-specific formatting
+    // Ensure minimum length and quality
     if (formatted.length < 50) {
-      // If response is too short, add more context
       formatted = this.expandShortResponse(formatted, userMessage);
     }
 
     // Add farming emojis for better readability
     formatted = this.addFarmingEmojis(formatted);
 
-    // Ensure response is helpful and complete
-    if (formatted.length < 20) {
-      formatted = this.generateContextualResponse(userMessage);
-    }
-
     return formatted;
-  }
-
-  private generateContextualResponse(userMessage: string): string {
-    const category = this.detectCategory(userMessage);
-    
-    const contextualResponses = {
-      crop: "🌱 For optimal crop management, I recommend focusing on soil preparation, proper irrigation timing, and integrated pest management. What specific crop are you working with?",
-      livestock: "🐄 Livestock health is crucial for farm success. Ensure regular vaccinations, quality feed, and clean water. What type of livestock do you need help with?",
-      weather: "🌦️ Weather planning is essential for farming success. Monitor forecasts closely and adjust planting schedules accordingly. What weather concerns do you have?",
-      market: "💰 Market timing can significantly impact your profits. Consider value-addition and direct marketing opportunities. What crops are you looking to sell?",
-      pest: "🐛 Integrated pest management combines prevention, monitoring, and targeted treatment. Early detection is key. What pest issues are you experiencing?",
-      soil: "🌾 Healthy soil is the foundation of productive farming. Regular testing and organic matter addition are essential. What soil challenges are you facing?"
-    };
-
-    return contextualResponses[category as keyof typeof contextualResponses] || 
-           "🌱 I'm here to help with all your farming questions! Please provide more details about your specific situation so I can give you the best advice.";
   }
 
   private expandShortResponse(text: string, userMessage: string): string {
     const category = this.detectCategory(userMessage);
     
     const expansions = {
-      crop: "🌱 For optimal crop management, consider soil testing, proper irrigation scheduling, and integrated pest management practices.",
-      livestock: "🐄 Ensure regular health checkups, proper nutrition, and maintain clean living conditions for your livestock.",
-      weather: "🌦️ Monitor weather patterns closely and adjust farming activities accordingly. Consider climate-smart agriculture practices.",
-      market: "💰 Stay updated with market trends and consider value-addition opportunities to maximize profits.",
-      pest: "🐛 Implement integrated pest management (IPM) combining biological, cultural, and chemical controls.",
-      soil: "🌾 Regular soil testing and organic matter addition are key to maintaining soil health and productivity."
+      crop: "🌱 For optimal crop management, consider soil testing, proper irrigation scheduling, and integrated pest management practices. Monitor your crops regularly for early problem detection.",
+      livestock: "🐄 Ensure regular health checkups, proper nutrition, and maintain clean living conditions for your livestock. Prevention is always better than treatment.",
+      weather: "🌦️ Monitor weather patterns closely and adjust farming activities accordingly. Consider climate-smart agriculture practices to build resilience.",
+      market: "💰 Stay updated with market trends and consider value-addition opportunities to maximize profits. Direct marketing can often yield better prices.",
+      pest: "🐛 Implement integrated pest management (IPM) combining biological, cultural, and chemical controls. Early detection and prevention are key.",
+      soil: "🌾 Regular soil testing and organic matter addition are essential for maintaining soil health and productivity. Healthy soil equals healthy crops."
     };
 
-    return text + " " + (expansions[category as keyof typeof expansions] || "Consider consulting with local agricultural extension services for personalized advice.");
+    return text + " " + (expansions[category as keyof typeof expansions] || "Consider consulting with local agricultural extension services for personalized advice specific to your area.");
   }
 
   private addFarmingEmojis(text: string): string {
@@ -246,9 +248,16 @@ Respond as a knowledgeable farming expert would.`;
 
   public getApiKeyStatus(): string {
     if (!this.apiKey) return 'Not configured';
-    if (this.apiKey === 'your_huggingface_api_key_here') return 'Placeholder value';
+    if (this.apiKey.includes('your_') && this.apiKey.includes('_key_here')) return 'Placeholder value';
     if (this.apiKey.length < 10) return 'Invalid key';
-    return 'Configured';
+    return `Configured (${this.baseUrl.includes('openai') ? 'OpenAI' : 'Alternative Provider'})`;
+  }
+
+  public getProviderInfo(): string {
+    if (this.baseUrl.includes('openai.com')) return 'OpenAI GPT-3.5';
+    if (this.baseUrl.includes('together.xyz')) return 'Together AI (Llama-2)';
+    if (this.baseUrl.includes('groq.com')) return 'Groq (Llama-2)';
+    return 'Custom Provider';
   }
 }
 

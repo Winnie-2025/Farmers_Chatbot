@@ -558,7 +558,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
       
       // Try to use Llama AI for smart responses if available
       if (llamaService.isServiceAvailable()) {
-        console.log('🦙 Using Llama AI for smart response generation...');
+        console.log('🤖 Using AI for smart response generation...');
         llamaService.generateResponse(text, {
           category,
           farmData: parseAgricultureData().slice(0, 10),
@@ -569,7 +569,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
             experience: 'intermediate'
           }
         }).then(response => {
-          console.log('✅ Llama AI response generated successfully');
+          console.log('✅ AI response generated successfully');
           const llamaResponse: Message = {
             id: (Date.now() + 2).toString(),
             text: `🤖 **AI Response** (Confidence: ${Math.round(response.confidence * 100)}%)\n\n${response.text}`,
@@ -580,7 +580,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
           setMessages((prev) => [...prev, llamaResponse]);
           saveChatMessage(llamaResponse);
         }).catch(error => {
-          console.warn('🦙 Llama AI failed, using fallback response system:', error.message);
+          console.warn('🤖 AI service failed, using fallback response system:', error.message);
           const fallbackResponse = generateBotResponse(text, category);
           const botResponse: Message = {
             id: (Date.now() + 2).toString(),
@@ -739,7 +739,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
         {llamaService.isServiceAvailable() && (
           <div className="mb-3 flex items-center space-x-2 text-sm text-green-600">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span>🦙 **AI Enhanced** - Smart responses powered by Llama AI</span>
+            <span>🤖 **AI Enhanced** - Smart responses powered by {llamaService.getProviderInfo()}</span>
           </div>
         )}
         
@@ -747,7 +747,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
         {!llamaService.isServiceAvailable() && (
           <div className="mb-3 flex items-center space-x-2 text-sm text-amber-600">
             <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-            <span>📚 **Knowledge Base Mode** - Add Hugging Face API key for AI responses</span>
+            <span>📚 **Knowledge Base Mode** - Add AI API key for enhanced responses</span>
           </div>
         )}
         
