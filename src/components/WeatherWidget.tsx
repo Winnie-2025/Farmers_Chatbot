@@ -49,13 +49,8 @@ export const WeatherWidget: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const apiKey = import.meta.env.VITE_AFRIGIS_API_KEY;
-      if (!apiKey) {
-        throw new Error('AfriGIS API key not configured');
-      }
-      
       const response = await fetch(
-        `https://afrigis.services/weather-10-day-forecast/v1/getHourlyByCoords?latitude=${location.lat}&longitude=${location.lng}&station_count=1&location_buffer=1&day_count=10&apiKey=${apiKey}`
+        `https://afrigis.services/weather-10-day-forecast/v1/getHourlyByCoords?latitude=${location.lat}&longitude=${location.lng}&station_count=1&location_buffer=1&day_count=10`
       );
       
       if (!response.ok) {
