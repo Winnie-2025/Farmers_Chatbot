@@ -747,7 +747,7 @@ ${recommendations.slice(0, 3).map((rec, index) =>
         {!llamaService.isServiceAvailable() && (
           <div className="mb-3 flex items-center space-x-2 text-sm text-amber-600">
             <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-            <span>📚 **Knowledge Base Mode** - Add AI API key for enhanced responses</span>
+            <span>📚 **Knowledge Base Mode** - Enhanced responses</span>
           </div>
         )}
         
