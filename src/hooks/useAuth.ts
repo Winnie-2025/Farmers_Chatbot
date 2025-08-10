@@ -14,23 +14,33 @@ export const useAuth = () => {
       return
     }
 
-    // Clear any existing invalid sessions
-    const clearInvalidSession = async () => {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
-        // Clear local storage auth data
-        localStorage.removeItem(`sb-${finalUrl.split('//')[1].split('.')[0]}-auth-token`)
-        
-        // Set initial state
-        setUser(null)
+        const { data: { session } } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
         setLoading(false)
       } catch (error) {
-        console.warn('Failed to clear session:', error)
+        console.warn('Failed to get initial session:', error)
         setUser(null)
         setLoading(false)
       }
     }
 
-    clearInvalidSession()
+    getInitialSession()
+
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null)
+        setLoading(false)
+      }
+    )
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email: string, password: string) => {
