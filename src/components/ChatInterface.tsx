@@ -254,7 +254,7 @@ export const ChatInterface: React.FC = () => {
   };
 
   const saveChatMessage = async (message: Message) => {
-    if (!user) return;
+    if (!user || !isSupabaseAvailable) return;
 
     try {
       const { error } = await supabase

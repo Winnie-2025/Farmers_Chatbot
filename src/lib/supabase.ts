@@ -1,18 +1,40 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+// Check if Supabase credentials are properly configured
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Validate environment variables
-if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'your_supabase_url_here') {
-  console.warn('VITE_SUPABASE_URL is not set or contains placeholder value. Please update your .env file.')
+const isSupabaseConfigured = supabaseUrl && 
+  supabaseAnonKey && 
+  supabaseUrl !== 'your_supabase_url_here' && 
+  supabaseAnonKey !== 'your_supabase_anon_key_here' &&
+  supabaseUrl.includes('supabase.co')
+
+// Use dummy values if not configured to prevent connection errors
+const finalUrl = isSupabaseConfigured ? supabaseUrl : 'https://dummy.supabase.co'
+const finalKey = isSupabaseConfigured ? supabaseAnonKey : 'dummy-key'
+
+// Log configuration status
+if (!isSupabaseConfigured) {
+  console.warn('⚠️ Supabase not configured. Using offline mode. To enable database features, add your Supabase credentials to .env file.')
+} else {
+  console.log('✅ Supabase configured successfully')
 }
 
-if (!import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY === 'your_supabase_anon_key_here') {
-  console.warn('VITE_SUPABASE_ANON_KEY is not set or contains placeholder value. Please update your .env file.')
-}
+export const supabase = createClient(finalUrl, finalKey, {
+  auth: {
+    persistSession: isSupabaseConfigured,
+    autoRefreshToken: isSupabaseConfigured,
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: isSupabaseConfigured ? 10 : 0
+    }
+  }
+})
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Export configuration status for use in components
+export const isSupabaseAvailable = isSupabaseConfigured
 
 export type Database = {
   public: {
