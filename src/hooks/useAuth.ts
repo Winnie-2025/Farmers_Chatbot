@@ -14,31 +14,23 @@ export const useAuth = () => {
       return
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.warn('Session retrieval error:', error.message);
-        // Don't treat auth errors as fatal - just continue without user
-      }
-      setUser(session?.user ?? null)
-      setLoading(false)
-    }).catch((error) => {
-      console.warn('Failed to get session:', error.message);
-      // Gracefully handle auth failures
-      setUser(null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event);
-        setUser(session?.user ?? null)
+    // Clear any existing invalid sessions
+    const clearInvalidSession = async () => {
+      try {
+        // Clear local storage auth data
+        localStorage.removeItem(`sb-${finalUrl.split('//')[1].split('.')[0]}-auth-token`)
+        
+        // Set initial state
+        setUser(null)
+        setLoading(false)
+      } catch (error) {
+        console.warn('Failed to clear session:', error)
+        setUser(null)
         setLoading(false)
       }
-    )
+    }
 
-    return () => subscription.unsubscribe()
+    clearInvalidSession()
   }, [])
 
   const signUp = async (email: string, password: string) => {

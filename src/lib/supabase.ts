@@ -23,8 +23,9 @@ if (!isSupabaseConfigured) {
 
 export const supabase = createClient(finalUrl, finalKey, {
   auth: {
-    persistSession: isSupabaseConfigured,
-    autoRefreshToken: isSupabaseConfigured,
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
   },
   realtime: {
     params: {
